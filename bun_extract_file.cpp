@@ -1,5 +1,8 @@
 #include <bun.h>
 
+#include <path_rep.h>
+#include <path_util.h>
+
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -26,7 +29,7 @@ int main(int argc, char** argv) {
 
 	Vfs* vfs = nullptr;
 	namespace ggpk = poe::format::ggpk;
-
+	// Define GGPK helper
 	struct GgpkVfs {
 		Vfs vfs;
 		std::unique_ptr<poe::format::ggpk::parsed_ggpk> pack;
@@ -75,6 +78,7 @@ int main(int argc, char** argv) {
 		memcpy(out, gvfs->pack->mapping_.data() + f->data_offset_ + offset, size);
 		return size;
 	};
+	// If provided path leads to GGPK file, use GGPK helper
 	if (ggpk_or_steam_dir.extension() == ".ggpk") {
 		ggpk_vfs.pack = poe::format::ggpk::index_ggpk(ggpk_or_steam_dir);
 		vfs = &ggpk_vfs.vfs;
@@ -85,6 +89,7 @@ int main(int argc, char** argv) {
 #else
 	std::string ooz_dll = "./liblibooz.so";
 #endif
+
 	Bun* bun = BunNew(ooz_dll.c_str(), "Ooz_Decompress");
 	if (!bun) {
 		fprintf(stderr, "Could not initialize Bun library\n");
@@ -105,8 +110,26 @@ int main(int argc, char** argv) {
 		}
 	}
 	else {
-		for (size_t i = 3; i < argc; ++i) {
-			wanted_paths.push_back(argv[i]);
+		std::string argv3(argv[3]);
+		if (!argv3.compare("-all")) {
+			printf("'-all' flag specified. Preparing to extract ALL of PoE's files.\n");
+			BunMem inner_mem = BunIndexPathRepContents(idx);
+			wanted_paths = generate_paths(inner_mem, BunMemSize(inner_mem));
+			if (wanted_paths.size() > 0) {
+				printf("Successfully generated path names from binary index file.\n");
+			}
+
+			if (argc > 4 && !std::string(argv[4]).compare("-tree")) {
+				printf("'-tree' flag specified. Preparing to generate and display a tree of files.\n");
+				printf("\n---BEGIN TREE---\n");
+				printTree(genDirTree(wanted_paths), 0, 2, false);
+				printf("\n---END TREE---\n");
+			}
+		}
+		else {
+			for (size_t i = 3; i < argc; ++i) {
+				wanted_paths.push_back(argv[i]);
+			}
 		}
 	}
 
@@ -137,11 +160,18 @@ int main(int argc, char** argv) {
 		BunIndexFileInfo(idx, file_id, &path_hash, &bundle_id, &ei.offset, &ei.size);
 		bundle_parts_to_extract[bundle_id].push_back(ei);
 	}
-
+	long count = 0;
+	long num_bundles = bundle_parts_to_extract.size();
 	for (auto& [bundle_id, parts] : bundle_parts_to_extract) {
+		fprintf(stdout, "Extracting from bundle with id '%s'\t (%u / %u) (%.2f%%)\n", std::to_string(bundle_id).c_str(), ++count, num_bundles, ((float)count/(float)num_bundles)*100 );
 		std::vector<uint8_t> bundle_data;
 		auto bundle_mem = BunIndexExtractBundle(idx, bundle_id);
+		int partCount = 0;
+		int num_parts = parts.size();
 		for (auto& part : parts) {
+			fprintf(stdout, "\tExtracting file from bundle ( %u / %u )\r", ++partCount, num_parts);//Path: '%s' , part.path.c_str()
+			fflush(stdout);
+
 			std::filesystem::path output_path = output_dir / part.path;
 			std::filesystem::create_directories(output_path.parent_path(), ec);
 			if (!dump_file(output_path, bundle_mem + part.offset, part.size)) {

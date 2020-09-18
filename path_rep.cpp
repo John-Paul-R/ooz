@@ -24,7 +24,7 @@
 * The template section can be empty (two zero words after each other), typically
 * done to emit a single string as-is.
 */
-std::vector<std::string> generate_paths(void const* spec_data, size_t spec_size) {
+ std::vector<std::string> generate_paths(void const* spec_data, size_t spec_size) {
 	reader r(spec_data, spec_size);
 
 	bool base_phase = false;

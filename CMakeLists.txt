@@ -41,6 +41,8 @@ add_library(bunutil STATIC
     "fnv.cpp" "fnv.h"
     "util.cpp" "util.h"
     "utf.cpp" "utf.h"
+	"path_rep.cpp" "path_rep.h"
+	"path_util.cpp" "path_util.h"
     )
 target_include_directories(bunutil PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -54,7 +56,7 @@ if (UNIX)
     )
 endif()
 
-add_library(libbun SHARED  "bun.cpp" "bun.h")
+add_library(libbun SHARED "bun.cpp" "bun.h")
 target_compile_definitions(libbun PUBLIC BUN_DYNAMIC)
 target_compile_definitions(libbun PRIVATE BUN_BUILD_DLL)
 target_include_directories(libbun INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
